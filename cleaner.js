@@ -17,7 +17,7 @@ function logMessage(message) {
 function reflex_agent(location, state) {
     if (state === "DIRTY") return "CLEAN";
     else if (location === "A") return "RIGHT";
-    else return "LEFT";
+    else if (location === "B") return "LEFT";
 }
 
 function randomlyDirty(states) {
@@ -35,7 +35,7 @@ function randomlyDirty(states) {
 
 function test(states) {
     if (iterationCount >= MAX_ITERATIONS) {
-        logMessage("<b>⚠ Max iterations reached. Stopping...</b>");
+        logMessage("<b>Max iterations reached. Stopping...</b>");
         return;
     }
 
