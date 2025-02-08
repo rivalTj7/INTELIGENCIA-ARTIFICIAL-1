@@ -1,98 +1,73 @@
-// Constantes para estados y acciones
-const ESTADOS = {
-    SUCIO: 'DIRTY',
-    LIMPIO: 'CLEAN',
-    UBICACION_A: 'A',
-    UBICACION_B: 'B'
-};
-
-const ACCIONES = {
-    LIMPIAR: 'CLEAN',
-    IZQUIERDA: 'LEFT',
-    DERECHA: 'RIGHT'
-};
-
-const PROBABILIDAD = {
-    AMBOS_LIMPIOS: 0.3, // Reducida para evitar ciclos infinitos
-    GENERAL: 0.1
-};
-
-// Configuración global
-const CONFIG = {
-    ITERACIONES_MAX: 50,
-    INTERVALO: 1000,
-    MAX_ITERACIONES_LIMPIAS: 5 // Iteraciones consecutivas limpias para terminar
-};
-
-// Variables de estado
-let iteracionesLimpias = 0;
-let contadorIteraciones = 0;
-
-// Utilidades
-function registrarMensaje(mensaje) {
-    const logDiv = document.getElementById("log");
-    logDiv.innerHTML += `${logDiv.innerHTML ? '<br>' : ''}${mensaje}`;
-    logDiv.scrollTop = logDiv.scrollHeight;
+function getStateString(states) {
+    return states.join(",");
 }
+let statesVisited = new Set();
+const TOTAL_STATE_COUNT = 8;
 
-// Lógica del agente
-function agenteReflexivo(ubicacion, estadoActual) {
-    return estadoActual === ESTADOS.SUCIO ? ACCIONES.LIMPIAR :
-           ubicacion === ESTADOS.UBICACION_A ? ACCIONES.DERECHA : ACCIONES.IZQUIERDA;
-}
-
-// Ensucia aleatoriamente una habitación con menor probabilidad
-function ensuciarAleatorio(estado) {
-    if (Math.random() < (estado[1] === ESTADOS.LIMPIO && estado[2] === ESTADOS.LIMPIO ? PROBABILIDAD.AMBOS_LIMPIOS : PROBABILIDAD.GENERAL)) {
-        const habitacion = Math.random() < 0.5 ? 1 : 2;
-        estado[habitacion] = ESTADOS.SUCIO;
-        registrarMensaje(`<b>¡HABITACIÓN ENSUCIADA! ${habitacion === 1 ? 'A' : 'B'}</b>`);
+function reflex_agent(location, state) {
+    switch(state) {
+        case "DIRTY":
+            return "CLEAN";
+        default:
+            return location === "A" ? "RIGHT" : "LEFT";
     }
 }
 
-// Simulación principal
-function simular(estado) {
-    if (contadorIteraciones >= CONFIG.ITERACIONES_MAX) {
-        registrarMensaje("<b>Límite de iteraciones alcanzado</b>");
-        return;
+function randomlyDirty(states) {
+    const bothClean = states.slice(1).every(state => state === "CLEAN");
+    const probability = bothClean ? 0.7 : 0.3;
+  
+    if (Math.random() < probability) {
+        const roomIndex = Math.random() < 0.5 ? 1 : 2;
+        if (states[roomIndex] === "CLEAN") {
+            states[roomIndex] = "DIRTY";
+            const roomLabel = roomIndex === 1 ? 'A' : 'B';
+            document.getElementById("log").innerHTML += `<br><b>Room ${roomLabel} got dirty!</b>`;
+        }
     }
-    contadorIteraciones++;
-    
-    const [ubicacion, estadoA, estadoB] = estado;
-    const estadoActual = ubicacion === ESTADOS.UBICACION_A ? estadoA : estadoB;
-    const accion = agenteReflexivo(ubicacion, estadoActual);
+}
 
-    registrarMensaje(`Iteración: ${contadorIteraciones} | Ubicación: ${ubicacion} | 🛠 Acción: ${accion} | Estado A: ${estadoA} | Estado B: ${estadoB}`);
+function test(states) {
+    const currentState = getStateString(states);
+    const wasVisited = statesVisited.has(currentState);
+    statesVisited.add(currentState);
 
-    switch (accion) {
-        case ACCIONES.LIMPIAR:
-            estado[ubicacion === ESTADOS.UBICACION_A ? 1 : 2] = ESTADOS.LIMPIO;
-            iteracionesLimpias = 0;
-            break;
-        case ACCIONES.DERECHA:
-            estado[0] = ESTADOS.UBICACION_B;
-            break;
-        case ACCIONES.IZQUIERDA:
-            estado[0] = ESTADOS.UBICACION_A;
-            break;
+    if (!wasVisited) {
+        document.getElementById("log").innerHTML += `<br><b><i>Estado:(${statesVisited.size})</i></b>`;
     }
 
-    if ([ACCIONES.DERECHA, ACCIONES.IZQUIERDA].includes(accion)) {
-        ensuciarAleatorio(estado);
+    const [location, stateA, stateB] = states;
+    const state = location === "A" ? stateA : stateB;
+    const action = reflex_agent(location, state);
+
+    document.getElementById("log").innerHTML += `<br>Location: ${location} | Action: ${action} | Other room state: ${location === "A" ? stateB : stateA}`;
+
+    if (action === "CLEAN") {
+        const index = location === "A" ? 1 : 2;
+        states[index] = "CLEAN";
+        document.getElementById("log").innerHTML += `<br>Room ${location} has been cleaned.`;
+    } else {
+        states[0] = action === "RIGHT" ? "B" : "A";
+        document.getElementById("log").innerHTML += `<br>The cleaner moved to room ${states[0]}.`;
     }
 
-    if (estado[1] === ESTADOS.LIMPIO && estado[2] === ESTADOS.LIMPIO) {
-        iteracionesLimpias++;
-        if (iteracionesLimpias >= CONFIG.MAX_ITERACIONES_LIMPIAS) {
-            registrarMensaje("<b>¡Limpieza estable alcanzada! Terminando simulación.</b>");
+    if (action === "RIGHT" || action === "LEFT") {
+        randomlyDirty(states);
+    }
+
+    if (statesVisited.size === TOTAL_STATE_COUNT) {
+        document.getElementById("log").innerHTML += `<br><b><i>All possible states have been visited!</i></b>`;
+        if (states[1] === "DIRTY" || states[2] === "DIRTY") {
+            setTimeout(() => test(states), 2000);
+        } else {
+            document.getElementById("log").innerHTML += `<br><b><i>Limpieza completa!</i></b>`;
             return;
         }
     } else {
-        iteracionesLimpias = 0;
+        setTimeout(() => test(states), 2000);
     }
-
-    setTimeout(simular, CONFIG.INTERVALO, estado);
 }
 
-// Iniciar simulación
-simular([ESTADOS.UBICACION_A, ESTADOS.SUCIO, ESTADOS.SUCIO]);
+// VERY FIRST CALL TO THE FUNCTION WITH THE STATE: A,DIRTY,DIRTY
+var states = ["A", "DIRTY", "DIRTY"];
+test(states);
