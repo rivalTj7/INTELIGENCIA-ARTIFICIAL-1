@@ -1,96 +1,98 @@
+// Constantes para estados y acciones
+const ESTADOS = {
+    SUCIO: 'DIRTY',
+    LIMPIO: 'CLEAN',
+    UBICACION_A: 'A',
+    UBICACION_B: 'B'
+};
 
-function getStateString(states) {
-    return `${states[0]},${states[1]},${states[2]}`;
-}
+const ACCIONES = {
+    LIMPIAR: 'CLEAN',
+    IZQUIERDA: 'LEFT',
+    DERECHA: 'RIGHT'
+};
 
-let visitedStates = new Set();
-const TOTAL_STATES = 8;
-let iterationCount = 0;
-const MAX_ITERATIONS = 50;
+const PROBABILIDAD = {
+    AMBOS_LIMPIOS: 0.3, // Reducida para evitar ciclos infinitos
+    GENERAL: 0.1
+};
 
-function logMessage(message) {
+// Configuración global
+const CONFIG = {
+    ITERACIONES_MAX: 50,
+    INTERVALO: 1000,
+    MAX_ITERACIONES_LIMPIAS: 5 // Iteraciones consecutivas limpias para terminar
+};
+
+// Variables de estado
+let iteracionesLimpias = 0;
+let contadorIteraciones = 0;
+
+// Utilidades
+function registrarMensaje(mensaje) {
     const logDiv = document.getElementById("log");
-    logDiv.innerHTML += `<br>${message}`;
+    logDiv.innerHTML += `${logDiv.innerHTML ? '<br>' : ''}${mensaje}`;
     logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-function reflex_agent(location, state) {
-    if (state === "DIRTY") return "CLEAN";
-    else if (location === "A") return "RIGHT";
-    else if (location === "B") return "LEFT";
+// Lógica del agente
+function agenteReflexivo(ubicacion, estadoActual) {
+    return estadoActual === ESTADOS.SUCIO ? ACCIONES.LIMPIAR :
+           ubicacion === ESTADOS.UBICACION_A ? ACCIONES.DERECHA : ACCIONES.IZQUIERDA;
 }
 
-function randomlyDirty(states) {
-    const bothClean = states[1] === "CLEAN" && states[2] === "CLEAN";
-    const probability = bothClean ? 0.7 : 0.2;
-
-    if (Math.random() < probability) {
-        const room = Math.random() < 0.5 ? 1 : 2;
-        if (states[room] === "CLEAN") {
-            states[room] = "DIRTY";
-            logMessage(`<b> A ROOM HAS BEEN DIRTIED! ${room === 1 ? "A" : "B"}!</b>`);
-        }
+// Ensucia aleatoriamente una habitación con menor probabilidad
+function ensuciarAleatorio(estado) {
+    if (Math.random() < (estado[1] === ESTADOS.LIMPIO && estado[2] === ESTADOS.LIMPIO ? PROBABILIDAD.AMBOS_LIMPIOS : PROBABILIDAD.GENERAL)) {
+        const habitacion = Math.random() < 0.5 ? 1 : 2;
+        estado[habitacion] = ESTADOS.SUCIO;
+        registrarMensaje(`<b>¡HABITACIÓN ENSUCIADA! ${habitacion === 1 ? 'A' : 'B'}</b>`);
     }
 }
 
-function test(states) {
-    if (iterationCount >= MAX_ITERATIONS) {
-        logMessage("<b>Max iterations reached. Stopping...</b>");
+// Simulación principal
+function simular(estado) {
+    if (contadorIteraciones >= CONFIG.ITERACIONES_MAX) {
+        registrarMensaje("<b>Límite de iteraciones alcanzado</b>");
         return;
     }
-
-    iterationCount++;
-    let currentSize = visitedStates.size;
-    const currentState = getStateString(states);
-    visitedStates.add(currentState);
+    contadorIteraciones++;
     
-    if (visitedStates.size > currentSize) {
-        logMessage(`<b> New visited state: ${currentState} (${visitedStates.size})</b>`);
+    const [ubicacion, estadoA, estadoB] = estado;
+    const estadoActual = ubicacion === ESTADOS.UBICACION_A ? estadoA : estadoB;
+    const accion = agenteReflexivo(ubicacion, estadoActual);
+
+    registrarMensaje(`Iteración: ${contadorIteraciones} | Ubicación: ${ubicacion} | 🛠 Acción: ${accion} | Estado A: ${estadoA} | Estado B: ${estadoB}`);
+
+    switch (accion) {
+        case ACCIONES.LIMPIAR:
+            estado[ubicacion === ESTADOS.UBICACION_A ? 1 : 2] = ESTADOS.LIMPIO;
+            iteracionesLimpias = 0;
+            break;
+        case ACCIONES.DERECHA:
+            estado[0] = ESTADOS.UBICACION_B;
+            break;
+        case ACCIONES.IZQUIERDA:
+            estado[0] = ESTADOS.UBICACION_A;
+            break;
     }
 
-    var location = states[0];
-    var state = location === "A" ? states[1] : states[2];
-    var action_result = reflex_agent(location, state);
-
-    logMessage(`Location: ${location} | 🛠 Action: ${action_result} | Other room: ${location === "A" ? states[2] : states[1]}`);
-
-    if (action_result === "CLEAN") {
-        if (location === "A") states[1] = "CLEAN";
-        else if (location === "B") states[2] = "CLEAN";
-    } else if (action_result === "RIGHT") {
-        states[0] = "B";
-    } else if (action_result === "LEFT") {
-        states[0] = "A";
+    if ([ACCIONES.DERECHA, ACCIONES.IZQUIERDA].includes(accion)) {
+        ensuciarAleatorio(estado);
     }
 
-    if (action_result === "RIGHT" || action_result === "LEFT") {
-        randomlyDirty(states);
-    }
-
-    if (visitedStates.size === TOTAL_STATES) {
-        logMessage("<b> Every possible state has been visited!</b>");
-        if (states[1] === "DIRTY" || states[2] === "DIRTY") {
-            setTimeout(() => test(states), 2000);
-        } else {
-            logMessage("<b> Cleaning completed!</b>");
+    if (estado[1] === ESTADOS.LIMPIO && estado[2] === ESTADOS.LIMPIO) {
+        iteracionesLimpias++;
+        if (iteracionesLimpias >= CONFIG.MAX_ITERACIONES_LIMPIAS) {
+            registrarMensaje("<b>¡Limpieza estable alcanzada! Terminando simulación.</b>");
             return;
         }
     } else {
-        setTimeout(() => test(states), 2000);
+        iteracionesLimpias = 0;
     }
+
+    setTimeout(simular, CONFIG.INTERVALO, estado);
 }
 
-var states = ["A", "DIRTY", "DIRTY"];
-test(states);
-
-/* Estados totales
-    TOTAL STATES IN THIS CASE ARE 8
-    A,DIRTY,DIRTY
-    A,DIRTY,CLEAN
-    A,CLEAN,DIRTY
-    A,CLEAN,CLEAN
-    B,DIRTY,DIRTY
-    B,DIRTY,CLEAN
-    B,CLEAN,DIRTY
-    B,CLEAN,CLEAN
-*/
+// Iniciar simulación
+simular([ESTADOS.UBICACION_A, ESTADOS.SUCIO, ESTADOS.SUCIO]);
